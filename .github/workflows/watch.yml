@@ -1,0 +1,107 @@
+name: MiraCosta Watch
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'デバッグ実行(HTMLスナップショットを保存)'
+        type: boolean
+        default: false
+      test_mail:
+        description: 'メール送信のテスト'
+        type: boolean
+        default: false
+
+concurrency:
+  group: mirakosta-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+
+    env:
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # === 修正版: 固定キーでキャッシュを安定化 ===
+      - name: Restore previous state
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: mirakosta-state
+          restore-keys: |
+            mirakosta-state
+
+      - name: Test mail (manual only)
+        if: github.event_name == 'workflow_dispatch' && inputs.test_mail
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+        run: python mirakosta_watch.py --test-mail
+
+      - name: Run watch
+        if: '!(github.event_name == ''workflow_dispatch'' && inputs.test_mail)'
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+        run: |
+          if [ "${{ inputs.debug }}" = "true" ]; then
+            python mirakosta_watch.py --debug
+          else
+            python mirakosta_watch.py
+          fi
+
+      - name: Show state (for log)
+        if: always()
+        run: |
+          if [ -f state.json ]; then
+            echo "=== state.json ==="
+            cat state.json
+          fi
+
+      # === 修正版: 固定キーで毎回上書き保存 ===
+      - name: Save new state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: mirakosta-state
+
+      - name: Upload debug snapshot (if any)
+        if: inputs.debug == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-snapshot-${{ github.run_id }}
+          path: debug/
+          if-no-files-found: ignore
+          retention-days: 3

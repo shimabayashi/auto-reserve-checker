@@ -1,0 +1,6 @@
+{
+  "target_url": "https://reserve.tokyodisneyresort.jp/sp/hotel/list/?showWay=&roomsNum=1&adultNum=2&childNum=0&stayingDays=1&useDate=20260917&cpListStr=&childAgeBedInform=&searchHotelCD=DHM&searchHotelDiv=&hotelName=&searchHotelName=&searchLayer=&searchRoomName=&hotelSearchDetail=true&checkPointStr=&displayType=data-hotel&reservationStatus=1",
+  "label": "ミラコスタ 2026/09/17 1泊2名",
+  "timeout_sec": 20,
+  "notify_on_unchanged_available": false
+}
